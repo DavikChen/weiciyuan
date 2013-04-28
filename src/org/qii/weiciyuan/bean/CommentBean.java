@@ -3,6 +3,7 @@ package org.qii.weiciyuan.bean;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import org.qii.weiciyuan.support.utils.ListViewTool;
+import org.qii.weiciyuan.support.utils.ObjectToStringUtility;
 import org.qii.weiciyuan.support.utils.TimeTool;
 
 /**
@@ -29,31 +30,12 @@ public class CommentBean extends ItemBean {
 
     private transient SpannableString listViewSpannableString;
 
-    private transient SpannableString listViewReplySpannableString;
-
-    //comment timeline show the comment content which is replied to
-    public SpannableString getListViewReplySpannableString() {
-        if (!TextUtils.isEmpty(listViewReplySpannableString)) {
-            return listViewReplySpannableString;
-        } else {
-            ListViewTool.addJustHighLightLinksOnlyReplyComment(this);
-
-            return listViewReplySpannableString;
-        }
-    }
-
-    public void setListViewReplySpannableString(SpannableString listViewReplySpannableString) {
-        this.listViewReplySpannableString = listViewReplySpannableString;
-    }
-
     //comment timeline show comment
     public SpannableString getListViewSpannableString() {
         if (!TextUtils.isEmpty(listViewSpannableString)) {
             return listViewSpannableString;
         } else {
             ListViewTool.addJustHighLightLinks(this);
-            if (reply_comment != null)
-                reply_comment.getListViewReplySpannableString();
             return listViewSpannableString;
         }
     }
@@ -65,6 +47,9 @@ public class CommentBean extends ItemBean {
     private long mills;
 
     public long getMills() {
+        if (mills == 0L) {
+            TimeTool.dealMills(this);
+        }
         return mills;
     }
 
@@ -132,5 +117,10 @@ public class CommentBean extends ItemBean {
 
     public void setStatus(MessageBean status) {
         this.status = status;
+    }
+
+    @Override
+    public String toString() {
+        return ObjectToStringUtility.toString(this);
     }
 }

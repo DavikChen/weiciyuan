@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.Configuration;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Rect;
@@ -16,20 +17,19 @@ import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
-import android.view.Display;
-import android.view.MotionEvent;
-import android.view.View;
+import android.view.*;
 import android.widget.ListView;
 import android.widget.ShareActionProvider;
 import org.qii.weiciyuan.bean.GeoBean;
 import org.qii.weiciyuan.bean.MessageBean;
+import org.qii.weiciyuan.bean.android.TimeLinePosition;
 import org.qii.weiciyuan.support.file.FileLocationMethod;
 import org.qii.weiciyuan.support.file.FileManager;
+import org.qii.weiciyuan.support.lib.AutoScrollListView;
 import org.qii.weiciyuan.support.lib.MyAsyncTask;
 import org.qii.weiciyuan.support.settinghelper.SettingUtility;
 
@@ -137,15 +137,10 @@ public class Utility {
     }
 
     public static void stopListViewScrollingAndScrollToTop(ListView listView) {
-        if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) {
-            listView.setSelection(0);
-            listView.dispatchTouchEvent(MotionEvent.obtain(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), MotionEvent.ACTION_CANCEL, 0, 0, 0));
-
-        } else {
-            listView.dispatchTouchEvent(MotionEvent.obtain(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), MotionEvent.ACTION_DOWN, 0, 0, 0));
-            listView.dispatchTouchEvent(MotionEvent.obtain(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, 0, 0, 0));
-            listView.setSelection(0);
-        }
+        if (listView instanceof AutoScrollListView)
+            ((AutoScrollListView) listView).requestPositionToScreen(0, true);
+        else
+            listView.smoothScrollToPosition(0, 0);
     }
 
     public static int dip2px(int dipValue) {
@@ -429,6 +424,8 @@ public class Utility {
     }
 
     public static void buildTabCount(ActionBar.Tab tab, String tabStrRes, int count) {
+        if (tab == null)
+            return;
         String content = tab.getText().toString();
         int value = 0;
         int start = content.indexOf("(");
@@ -440,6 +437,71 @@ public class Utility {
         if (value <= count) {
             tab.setText(tabStrRes + "(" + count + ")");
         }
+    }
+
+    public static TimeLinePosition getCurrentPositionFromListView(ListView listView) {
+        View view = listView.getChildAt(1);
+        int top = (view != null ? view.getTop() : 0);
+        return new TimeLinePosition(listView.getFirstVisiblePosition(), top);
+    }
+
+    public static String getIdFromWeiboAccountLink(String url) {
+        String id = url.substring(19);
+        id = id.replace("/", "");
+        return id;
+    }
+
+    public static String getDomainFromWeiboAccountLink(String url) {
+        String domain = url.substring(17);
+        domain = domain.replace("/", "");
+        return domain;
+    }
+
+    public static boolean isWeiboAccountIdLink(String url) {
+        return !TextUtils.isEmpty(url) && url.startsWith("http://weibo.com/u/");
+    }
+
+    public static boolean isWeiboAccountDomainLink(String url) {
+        if (TextUtils.isEmpty(url)) {
+            return false;
+        } else {
+            boolean a = url.startsWith("http://weibo.com/");
+            boolean b = !url.contains("?");
+            return a && b;
+        }
+    }
+
+    public static void vibrate(Context context, View view) {
+//        Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+//        vibrator.vibrate(30);
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+    }
+
+    public static void playClickSound(View view) {
+        view.playSoundEffect(SoundEffectConstants.CLICK);
+    }
+
+    public static View getListViewItemViewFromPosition(ListView listView, int position) {
+        return listView.getChildAt(position - listView.getFirstVisiblePosition());
+    }
+
+    public static String getMotionEventStringName(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                return "MotionEvent.ACTION_DOWN";
+            case MotionEvent.ACTION_UP:
+                return "MotionEvent.ACTION_UP";
+            case MotionEvent.ACTION_CANCEL:
+                return "MotionEvent.ACTION_CANCEL";
+            case MotionEvent.ACTION_MOVE:
+                return "MotionEvent.ACTION_MOVE";
+            default:
+                return "Other";
+        }
+    }
+
+    public static boolean isDevicePort() {
+        return GlobalContext.getInstance().getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 }
 

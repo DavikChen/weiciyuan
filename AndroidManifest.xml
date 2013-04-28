@@ -60,7 +60,7 @@
         <!--main activity -->
         <activity
             android:name=".ui.main.MainTimeLineActivity"
-
+            android:uiOptions="splitActionBarWhenNarrow"
             android:launchMode="singleTop"/>
 
         <!--send activity -->
@@ -98,6 +98,7 @@
             android:label="@string/comment_detail"/>
         <activity
             android:name=".ui.browser.BrowserBigPicActivity"
+            android:theme="@android:style/Theme.Holo.Light.Dialog.NoActionBar"
             android:launchMode="singleTop"/>
         <activity
             android:name=".ui.browser.BrowserLocalPicActivity"
@@ -191,6 +192,7 @@
             android:uiOptions="splitActionBarWhenNarrow"/>
         <activity android:name=".ui.preference.PerformanceActivity"/>
         <activity android:name=".ui.preference.AboutActivity"/>
+        <activity android:name=".ui.preference.LicenseActivity"/>
 
 
         <!-- service -->
@@ -206,7 +208,7 @@
         <!---broadcast receiver -->
         <receiver android:name=".othercomponent.unreadnotification.UnreadMsgReceiver">
             <intent-filter>
-                <action android:name="org.qii.weiciyuan.newmsg"/>
+                <action android:name="org.qii.weiciyuan.newmsg.priority"/>
             </intent-filter>
         </receiver>
         <receiver

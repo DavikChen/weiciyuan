@@ -38,7 +38,7 @@ public class ManageGroupActivity extends AbstractAppActivity {
         super.onCreate(savedInstanceState);
         getActionBar().setDisplayShowHomeEnabled(false);
         getActionBar().setDisplayShowTitleEnabled(true);
-        getActionBar().setDisplayHomeAsUpEnabled(true);
+        getActionBar().setDisplayHomeAsUpEnabled(false);
         getActionBar().setTitle(getString(R.string.friend_group));
 
         if (savedInstanceState == null) {
@@ -179,7 +179,7 @@ public class ManageGroupActivity extends AbstractAppActivity {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
 
-                View view = getActivity().getLayoutInflater().inflate(android.R.layout.simple_list_item_1, parent, false);
+                View view = getActivity().getLayoutInflater().inflate(R.layout.managegroupactivity_list_item_layout, parent, false);
                 TextView tv = (TextView) view;
                 tv.setBackgroundColor(defaultBG);
                 if (getListView().getCheckedItemPositions().get(position)) {

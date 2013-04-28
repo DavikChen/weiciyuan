@@ -1,27 +1,24 @@
 package org.qii.weiciyuan.ui.adapter;
 
-import android.app.Fragment;
-import android.content.Intent;
 import android.graphics.drawable.Drawable;
-import android.os.SystemClock;
+import android.os.Handler;
+import android.support.v4.app.Fragment;
 import android.text.Html;
-import android.text.SpannableString;
 import android.text.TextUtils;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
-import android.widget.TextView;
 import org.qii.weiciyuan.bean.MessageBean;
 import org.qii.weiciyuan.bean.UserBean;
 import org.qii.weiciyuan.support.asyncdrawable.TimeLineBitmapDownloader;
-import org.qii.weiciyuan.support.lib.MyLinkMovementMethod;
+import org.qii.weiciyuan.support.lib.AutoScrollListView;
+import org.qii.weiciyuan.support.lib.TopTipBar;
+import org.qii.weiciyuan.support.lib.VelocityListView;
 import org.qii.weiciyuan.support.settinghelper.SettingUtility;
-import org.qii.weiciyuan.support.utils.GlobalContext;
 import org.qii.weiciyuan.support.utils.ListViewTool;
-import org.qii.weiciyuan.ui.basefragment.AbstractTimeLineFragment;
-import org.qii.weiciyuan.ui.browser.BrowserWeiboMsgActivity;
+import org.qii.weiciyuan.support.utils.Utility;
 
 import java.util.HashMap;
 import java.util.List;
@@ -42,10 +39,69 @@ public class StatusListAdapter extends AbstractAppListAdapter<MessageBean> {
     private Map<String, Integer> oriMsgHeights = new HashMap<String, Integer>();
     private Map<String, Integer> oriMsgWidths = new HashMap<String, Integer>();
 
+    private TopTipBar topTipBar;
+
+    private Handler handler = new Handler();
+
     public StatusListAdapter(Fragment fragment, TimeLineBitmapDownloader commander, List<MessageBean> bean, ListView listView, boolean showOriStatus) {
-        super(fragment, commander, bean, listView, showOriStatus);
+        this(fragment, commander, bean, listView, showOriStatus, false);
     }
 
+    public StatusListAdapter(Fragment fragment, TimeLineBitmapDownloader commander, List<MessageBean> bean, ListView listView, boolean showOriStatus, boolean pre) {
+        super(fragment, commander, bean, listView, showOriStatus, pre);
+    }
+
+    public void setTopTipBar(TopTipBar bar) {
+        this.topTipBar = bar;
+        AutoScrollListView autoScrollListView = (AutoScrollListView) listView;
+        autoScrollListView.setOnScrollListener(new AbsListView.OnScrollListener() {
+
+            @Override
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+            }
+
+            @Override
+            public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
+                VelocityListView velocityListView = (VelocityListView) view;
+                if (velocityListView.getVelocity() < 0) {
+                    topTipBar.hideCount();
+                } else if (velocityListView.getVelocity() > 0) {
+                    if (topTipBar.getValues().size() == 0) {
+                        return;
+                    }
+
+                    View childView = Utility.getListViewItemViewFromPosition(listView, firstVisibleItem);
+
+                    if (childView == null) {
+                        return;
+                    }
+
+                    int position = firstVisibleItem - ((ListView) view).getHeaderViewsCount();
+
+                    if (childView.getTop() == 0 && position <= 0) {
+                        topTipBar.clearAndReset();
+                    } else {
+                        handle(position + 1);
+                    }
+                }
+            }
+
+            private void handle(int position) {
+                if (position > 0 && topTipBar != null && position < bean.size()) {
+                    MessageBean next = bean.get(position);
+                    if (next != null) {
+                        MessageBean helperMsg = bean.get(position - 1);
+                        String helperId = null;
+                        if (helperMsg != null) {
+                            helperId = helperMsg.getId();
+                        }
+                        topTipBar.handle(next.getId(), helperId);
+                    }
+                }
+
+            }
+        });
+    }
 
     @Override
     protected void bindViewData(final ViewHolder holder, int position) {
@@ -63,6 +119,7 @@ public class StatusListAdapter extends AbstractAppListAdapter<MessageBean> {
             holder.listview_root.setBackgroundColor(checkedBG);
 
         final MessageBean msg = bean.get(position);
+
         UserBean user = msg.getUser();
         if (user != null) {
             holder.username.setVisibility(View.VISIBLE);
@@ -111,65 +168,6 @@ public class StatusListAdapter extends AbstractAppListAdapter<MessageBean> {
             ListViewTool.addJustHighLightLinks(msg);
             holder.content.setText(msg.getListViewSpannableString());
         }
-
-        holder.listview_root.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!((AbstractTimeLineFragment) fragment).clearActionModeIfOpen()) {
-                    Intent intent = new Intent(getActivity(), BrowserWeiboMsgActivity.class);
-                    intent.putExtra("msg", msg);
-                    intent.putExtra("token", GlobalContext.getInstance().getSpecialToken());
-                    fragment.startActivityForResult(intent, 0);
-                }
-            }
-        });
-
-
-        holder.username.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                holder.listview_root.onTouchEvent(event);
-                return false;
-            }
-        });
-        holder.time.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                holder.listview_root.onTouchEvent(event);
-                return false;
-            }
-        });
-
-        //onTouchListener has some strange problem, when user click link, holder.listview_root may also receive a MotionEvent.ACTION_DOWN event
-        //the background then changed
-        View.OnTouchListener onTouchListener = new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                TextView tv = (TextView) v;
-                int start = tv.getSelectionStart();
-                int end = tv.getSelectionEnd();
-                SpannableString completeText = (SpannableString) ((TextView) v).getText();
-                boolean isNotLink = start == -1 || end == -1;
-
-                switch (event.getActionMasked()) {
-                    case MotionEvent.ACTION_UP:
-                        if (isNotLink && completeText.getSpanStart(this) == -1) {
-                            holder.listview_root.dispatchTouchEvent(MotionEvent.obtain(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), MotionEvent.ACTION_DOWN, 0, 0, 0));
-                            holder.listview_root.dispatchTouchEvent(MotionEvent.obtain(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, 0, 0, 0));
-                        }
-                        break;
-                }
-                return false;
-            }
-        };
-
-        holder.content.setOnTouchListener(onTouchListener);
-        holder.repost_content.setOnTouchListener(onTouchListener);
-
-        if (holder.content.getMovementMethod() != MyLinkMovementMethod.getInstance())
-            holder.content.setMovementMethod(MyLinkMovementMethod.getInstance());
-        if (holder.repost_content.getMovementMethod() != MyLinkMovementMethod.getInstance())
-            holder.repost_content.setMovementMethod(MyLinkMovementMethod.getInstance());
 
 
         holder.time.setTime(msg.getMills());
@@ -245,6 +243,7 @@ public class StatusListAdapter extends AbstractAppListAdapter<MessageBean> {
                 holder.repost_layout.setVisibility(View.GONE);
             holder.repost_flag.setVisibility(View.GONE);
         }
+
     }
 
 
@@ -286,5 +285,6 @@ public class StatusListAdapter extends AbstractAppListAdapter<MessageBean> {
             buildPic(repost_msg, holder.repost_content_pic, position);
         }
     }
+
 
 }

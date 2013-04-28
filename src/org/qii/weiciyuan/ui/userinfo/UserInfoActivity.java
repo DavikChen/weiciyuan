@@ -1,6 +1,9 @@
 package org.qii.weiciyuan.ui.userinfo;
 
-import android.app.*;
+import android.app.ActionBar;
+import android.app.AlertDialog;
+import android.app.Dialog;
+import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
@@ -8,6 +11,9 @@ import android.nfc.NdefMessage;
 import android.nfc.NfcAdapter;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.support.v4.app.DialogFragment;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.view.ViewPager;
 import android.text.TextUtils;
 import android.view.GestureDetector;
@@ -85,23 +91,37 @@ public class UserInfoActivity extends AbstractAppActivity implements IUserInfo {
         token = getIntent().getStringExtra("token");
         bean = (UserBean) getIntent().getSerializableExtra("user");
         if (bean == null) {
-            Uri data = getIntent().getData();
-            if (data != null) {
-                String d = data.toString();
-                int index = d.lastIndexOf("@");
-                String newValue = d.substring(index + 1);
+            String id = getIntent().getStringExtra("id");
+            if (!TextUtils.isEmpty(id)) {
                 bean = new UserBean();
-                bean.setScreen_name(newValue);
-            } else if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {
-                processIntent(getIntent());
+                bean.setId(id);
+            } else {
+                String domain = getIntent().getStringExtra("domain");
+                if (!TextUtils.isEmpty(domain)) {
+                    bean = new UserBean();
+                    bean.setDomain(domain);
+                } else {
+                    Uri data = getIntent().getData();
+                    if (data != null) {
+                        String d = data.toString();
+                        int index = d.lastIndexOf("@");
+                        String newValue = d.substring(index + 1);
+                        bean = new UserBean();
+                        bean.setScreen_name(newValue);
+                    } else if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {
+                        processIntent(getIntent());
+                    }
+                }
             }
             fetchUserInfoFromServer();
         } else {
             initLayout();
         }
 
-        if (bean.getScreen_name().equals(GlobalContext.getInstance().getCurrentAccountName())
-                || (bean.getId() != null && bean.getId().equals(GlobalContext.getInstance().getCurrentAccountId()))) {
+        boolean screenNameEqualCurrentAccount = bean.getScreen_name() != null
+                && bean.getScreen_name().equals(GlobalContext.getInstance().getCurrentAccountName());
+        boolean idEqualCurrentAccount = bean.getId() != null && bean.getId().equals(GlobalContext.getInstance().getCurrentAccountId());
+        if (screenNameEqualCurrentAccount || idEqualCurrentAccount) {
             Intent intent = new Intent(this, MyInfoActivity.class);
             intent.putExtra("token", getToken());
 
@@ -140,7 +160,7 @@ public class UserInfoActivity extends AbstractAppActivity implements IUserInfo {
 
         mViewPager = (MyViewPager) findViewById(R.id.viewpager);
         mViewPager.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        TimeLinePagerAdapter adapter = new TimeLinePagerAdapter(getFragmentManager());
+        TimeLinePagerAdapter adapter = new TimeLinePagerAdapter(getSupportFragmentManager());
         mViewPager.setOffscreenPageLimit(2);
         mViewPager.setAdapter(adapter);
         mViewPager.setOnPageChangeListener(onPageChangeListener);
@@ -275,19 +295,19 @@ public class UserInfoActivity extends AbstractAppActivity implements IUserInfo {
     }
 
     private AbstractTimeLineFragment getStatusFragment() {
-        return ((AbstractTimeLineFragment) getFragmentManager().findFragmentByTag(
+        return ((AbstractTimeLineFragment) getSupportFragmentManager().findFragmentByTag(
                 StatusesByIdTimeLineFragment.class.getName()));
     }
 
 
     private UserInfoFragment getInfoFragment() {
-        return ((UserInfoFragment) getFragmentManager().findFragmentByTag(
+        return ((UserInfoFragment) getSupportFragmentManager().findFragmentByTag(
                 UserInfoFragment.class.getName()));
     }
 
     private void manageGroup() {
         ManageGroupDialog dialog = new ManageGroupDialog(GlobalContext.getInstance().getGroup(), bean.getId());
-        dialog.show(getFragmentManager(), "");
+        dialog.show(getSupportFragmentManager(), "");
 
     }
 
@@ -567,10 +587,14 @@ public class UserInfoActivity extends AbstractAppActivity implements IUserInfo {
                 ShowUserDao dao = new ShowUserDao(GlobalContext.getInstance().getSpecialToken());
                 boolean haveId = !TextUtils.isEmpty(bean.getId());
                 boolean haveName = !TextUtils.isEmpty(bean.getScreen_name());
+                boolean haveDomain = !TextUtils.isEmpty(bean.getDomain());
+
                 if (haveId) {
                     dao.setUid(bean.getId());
                 } else if (haveName) {
                     dao.setScreen_name(bean.getScreen_name());
+                } else if (haveDomain) {
+                    dao.setDomain(bean.getDomain());
                 } else {
                     cancel(true);
                     return null;
@@ -599,7 +623,7 @@ public class UserInfoActivity extends AbstractAppActivity implements IUserInfo {
             super.onCancelled(userBean);
             if (this.e != null) {
                 UserInfoActivityErrorDialog userInfoActivityErrorDialog = new UserInfoActivityErrorDialog(this.e.getError());
-                userInfoActivityErrorDialog.show(getFragmentManager(), "");
+                userInfoActivityErrorDialog.show(getSupportFragmentManager(), "");
             }
         }
 

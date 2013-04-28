@@ -3,19 +3,26 @@ package org.qii.weiciyuan.othercomponent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.support.v4.content.LocalBroadcastManager;
 import org.qii.weiciyuan.bean.AccountBean;
 import org.qii.weiciyuan.bean.CommentListBean;
 import org.qii.weiciyuan.bean.MessageListBean;
 import org.qii.weiciyuan.bean.UnreadBean;
+import org.qii.weiciyuan.bean.android.CommentTimeLineData;
+import org.qii.weiciyuan.bean.android.MentionTimeLineData;
 import org.qii.weiciyuan.dao.maintimeline.MainCommentsTimeLineDao;
 import org.qii.weiciyuan.dao.maintimeline.MainMentionsTimeLineDao;
 import org.qii.weiciyuan.dao.maintimeline.MentionsCommentTimeLineDao;
 import org.qii.weiciyuan.dao.unread.UnreadDao;
-import org.qii.weiciyuan.othercomponent.unreadnotification.UnreadMsgReceiver;
 import org.qii.weiciyuan.support.database.AccountDBTask;
+import org.qii.weiciyuan.support.database.CommentsTimeLineDBTask;
+import org.qii.weiciyuan.support.database.MentionCommentsTimeLineDBTask;
+import org.qii.weiciyuan.support.database.MentionsTimeLineDBTask;
 import org.qii.weiciyuan.support.error.WeiboException;
 import org.qii.weiciyuan.support.lib.MyAsyncTask;
 import org.qii.weiciyuan.support.settinghelper.SettingUtility;
+import org.qii.weiciyuan.support.utils.AppEventAction;
+import org.qii.weiciyuan.support.utils.BundleArgsConstants;
 
 import java.util.Calendar;
 import java.util.List;
@@ -113,17 +120,44 @@ public class FetchNewMsgService extends Service {
                 int unreadMentionCommentCount = unreadBean.getMention_cmt();
 
                 if (unreadCommentCount > 0 && SettingUtility.allowCommentToMe()) {
-                    MainCommentsTimeLineDao commentDao = new MainCommentsTimeLineDao(token).setCount(String.valueOf(unreadCommentCount));
-                    commentResult = commentDao.getGSONMsgListWithoutClearUnread();
+                    MainCommentsTimeLineDao dao = new MainCommentsTimeLineDao(token);
+                    CommentListBean oldData = null;
+                    CommentTimeLineData commentTimeLineData = CommentsTimeLineDBTask.getCommentLineMsgList(accountBean.getUid());
+                    if (commentTimeLineData != null) {
+                        oldData = commentTimeLineData.cmtList;
+                    }
+                    if (oldData != null) {
+                        dao.setSince_id(oldData.getItem(0).getId());
+                    }
+                    dao.setCount(String.valueOf(unreadCommentCount));
+                    commentResult = dao.getGSONMsgListWithoutClearUnread();
                 }
 
                 if (unreadMentionStatusCount > 0 && SettingUtility.allowMentionToMe()) {
-                    MainMentionsTimeLineDao mentionDao = new MainMentionsTimeLineDao(token).setCount(String.valueOf(unreadMentionStatusCount));
-                    mentionStatusesResult = mentionDao.getGSONMsgListWithoutClearUnread();
+                    MainMentionsTimeLineDao dao = new MainMentionsTimeLineDao(token);
+                    MessageListBean oldData = null;
+                    MentionTimeLineData commentTimeLineData = MentionsTimeLineDBTask.getRepostLineMsgList(accountBean.getUid());
+                    if (commentTimeLineData != null) {
+                        oldData = commentTimeLineData.msgList;
+                    }
+                    if (oldData != null) {
+                        dao.setSince_id(oldData.getItem(0).getId());
+                    }
+                    dao.setCount(String.valueOf(unreadMentionStatusCount));
+                    mentionStatusesResult = dao.getGSONMsgListWithoutClearUnread();
                 }
 
                 if (unreadMentionCommentCount > 0 && SettingUtility.allowMentionCommentToMe()) {
-                    MainCommentsTimeLineDao dao = new MentionsCommentTimeLineDao(token).setCount(String.valueOf(unreadMentionCommentCount));
+                    MainCommentsTimeLineDao dao = new MentionsCommentTimeLineDao(token);
+                    CommentListBean oldData = null;
+                    CommentTimeLineData commentTimeLineData = MentionCommentsTimeLineDBTask.getCommentLineMsgList(accountBean.getUid());
+                    if (commentTimeLineData != null) {
+                        oldData = commentTimeLineData.cmtList;
+                    }
+                    if (oldData != null) {
+                        dao.setSince_id(oldData.getItem(0).getId());
+                    }
+                    dao.setCount(String.valueOf(unreadMentionCommentCount));
                     mentionCommentsResult = dao.getGSONMsgListWithoutClearUnread();
                 }
 
@@ -136,16 +170,17 @@ public class FetchNewMsgService extends Service {
                 cancel(true);
             }
 
-
             return null;
-
         }
 
         @Override
         protected void onPostExecute(Void sum) {
-
-            sendNewMsgBroadcast();
-
+            boolean mentionsWeibo = (mentionStatusesResult != null && mentionStatusesResult.getSize() > 0);
+            boolean menttinosComment = (mentionCommentsResult != null && mentionCommentsResult.getSize() > 0);
+            boolean commentsToMe = (commentResult != null && commentResult.getSize() > 0);
+            if (mentionsWeibo || menttinosComment || commentsToMe) {
+                sendNewMsgBroadcast();
+            }
             stopSelf();
             super.onPostExecute(sum);
         }
@@ -158,14 +193,16 @@ public class FetchNewMsgService extends Service {
 
         private void sendNewMsgBroadcast() {
 
-            Intent intent = new Intent(UnreadMsgReceiver.ACTION);
-            intent.putExtra("account", accountBean);
-            intent.putExtra("comment", commentResult);
-            intent.putExtra("repost", mentionStatusesResult);
-            intent.putExtra("mention_comment", mentionCommentsResult);
-            intent.putExtra("unread", unreadBean);
+            Intent intent = new Intent(AppEventAction.NEW_MSG_PRIORITY_BROADCAST);
+            intent.putExtra(BundleArgsConstants.ACCOUNT_EXTRA, accountBean);
+            intent.putExtra(BundleArgsConstants.COMMENTS_TO_ME_EXTRA, commentResult);
+            intent.putExtra(BundleArgsConstants.MENTIONS_WEIBO_EXTRA, mentionStatusesResult);
+            intent.putExtra(BundleArgsConstants.MENTIONS_COMMENT_EXTRA, mentionCommentsResult);
+            intent.putExtra(BundleArgsConstants.UNREAD_EXTRA, unreadBean);
             sendOrderedBroadcast(intent, null);
 
+            intent.setAction(AppEventAction.NEW_MSG_BROADCAST);
+            LocalBroadcastManager.getInstance(getBaseContext()).sendBroadcast(intent);
         }
     }
 

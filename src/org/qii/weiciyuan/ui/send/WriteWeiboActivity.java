@@ -22,6 +22,7 @@ import android.widget.*;
 import org.qii.weiciyuan.R;
 import org.qii.weiciyuan.bean.AccountBean;
 import org.qii.weiciyuan.bean.GeoBean;
+import org.qii.weiciyuan.bean.android.MusicInfo;
 import org.qii.weiciyuan.othercomponent.sendweiboservice.SendWeiboService;
 import org.qii.weiciyuan.support.database.DraftDBManager;
 import org.qii.weiciyuan.support.database.draftbean.StatusDraftBean;
@@ -367,7 +368,7 @@ public class WriteWeiboActivity extends AbstractAppActivity implements DialogInt
         setContentView(R.layout.writeweiboactivity_layout);
 
         ActionBar actionBar = getActionBar();
-        actionBar.setDisplayHomeAsUpEnabled(true);
+        actionBar.setDisplayHomeAsUpEnabled(false);
         actionBar.setTitle(R.string.write_weibo);
         actionBar.setDisplayShowHomeEnabled(true);
         actionBar.setDisplayShowTitleEnabled(true);
@@ -551,7 +552,7 @@ public class WriteWeiboActivity extends AbstractAppActivity implements DialogInt
             menu.findItem(R.id.menu_clear).setVisible(false);
         }
 
-        MainTimeLineActivity.MusicInfo musicInfo = GlobalContext.getInstance().getMusicInfo();
+        MusicInfo musicInfo = GlobalContext.getInstance().getMusicInfo();
         if (!musicInfo.isEmpty()) {
             MenuItem musicMenu = menu.findItem(R.id.menu_add_now_playing);
             musicMenu.setVisible(true);
@@ -597,7 +598,7 @@ public class WriteWeiboActivity extends AbstractAppActivity implements DialogInt
                 addLocation();
                 break;
             case R.id.menu_add_now_playing:
-                MainTimeLineActivity.MusicInfo musicInfo = GlobalContext.getInstance().getMusicInfo();
+                MusicInfo musicInfo = GlobalContext.getInstance().getMusicInfo();
                 if (!musicInfo.isEmpty())
                     content.append(musicInfo.toString());
                 break;

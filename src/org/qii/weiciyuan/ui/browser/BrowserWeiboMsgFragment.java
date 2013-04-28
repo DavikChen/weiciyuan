@@ -6,10 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.text.Html;
 import android.text.TextUtils;
-import android.view.LayoutInflater;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
+import android.view.*;
 import android.widget.*;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.maps.MapView;
@@ -18,9 +15,9 @@ import org.qii.weiciyuan.R;
 import org.qii.weiciyuan.bean.GeoBean;
 import org.qii.weiciyuan.bean.MessageBean;
 import org.qii.weiciyuan.support.asyncdrawable.MsgDetailReadWorker;
+import org.qii.weiciyuan.support.lib.LongClickableLinkMovementMethod;
 import org.qii.weiciyuan.support.lib.MyAsyncTask;
 import org.qii.weiciyuan.support.utils.GlobalContext;
-import org.qii.weiciyuan.support.utils.ListViewTool;
 import org.qii.weiciyuan.support.utils.Utility;
 import org.qii.weiciyuan.ui.interfaces.AbstractAppActivity;
 import org.qii.weiciyuan.ui.interfaces.AbstractAppFragment;
@@ -77,10 +74,15 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
         this.msg = msg;
     }
 
+    private boolean hasGpsInfo() {
+        return (this.msg != null) && (this.msg.getGeo() != null);
+    }
+
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        layout.mapView.onSaveInstanceState(outState);
+        if (hasGpsInfo())
+            layout.mapView.onSaveInstanceState(outState);
         outState.putSerializable("msg", msg);
     }
 
@@ -88,7 +90,8 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
-            MapsInitializer.initialize(getActivity());
+            if (hasGpsInfo())
+                MapsInitializer.initialize(getActivity());
         } catch (GooglePlayServicesNotAvailableException impossible) {
                       /* Impossible */
         }
@@ -133,7 +136,8 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
     public void onResume() {
         super.onResume();
 //        buildViewData(false);
-        layout.mapView.onResume();
+        if (hasGpsInfo())
+            layout.mapView.onResume();
     }
 
     @Override
@@ -170,18 +174,41 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
         layout.time = (TextView) view.findViewById(R.id.time);
         layout.location = (TextView) view.findViewById(R.id.location);
         layout.source = (TextView) view.findViewById(R.id.source);
-        layout.mapView = (MapView) view.findViewById(R.id.location_mv);
-        if (savedInstanceState != null) {
+        if (hasGpsInfo()) {
+            ViewStub stub = (ViewStub) view.findViewById(R.id.stub);
+            View inflated = stub.inflate();
+            layout.mapView = (MapView) inflated.findViewById(R.id.location_mv);
+        }
+        if (savedInstanceState != null && hasGpsInfo()) {
             MessageBean msg = (MessageBean) savedInstanceState.get("msg");
             savedInstanceState.remove("msg");
             layout.mapView.onCreate(savedInstanceState);
             savedInstanceState.putSerializable("msg", msg);
-        } else {
+        } else if (hasGpsInfo()) {
             layout.mapView.onCreate(savedInstanceState);
         }
         layout.comment_count = (TextView) view.findViewById(R.id.comment_count);
         layout.repost_count = (TextView) view.findViewById(R.id.repost_count);
         layout.count_layout = view.findViewById(R.id.count_layout);
+
+        layout.avatar = (ImageView) view.findViewById(R.id.avatar);
+        layout.content_pic = (ImageView) view.findViewById(R.id.content_pic);
+        layout.repost_pic = (ImageView) view.findViewById(R.id.repost_content_pic);
+
+        layout.content_pic_pb = (ProgressBar) view.findViewById(R.id.content_pic_pb);
+        layout.repost_pic_pb = (ProgressBar) view.findViewById(R.id.repost_content_pic_pb);
+
+        layout.repost_layout = (RelativeLayout) view.findViewById(R.id.repost_layout);
+        layout.pic_layout = (FrameLayout) view.findViewById(R.id.pic_layout);
+        layout.repost_pic_layout = (FrameLayout) view.findViewById(R.id.repost_pic_layout);
+    }
+
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        layout.content_pic.setOnClickListener(picOnClickListener);
+        layout.repost_pic.setOnClickListener(picOnClickListener);
 
         layout.location.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -206,14 +233,6 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
                 }
             }
         });
-
-        layout.avatar = (ImageView) view.findViewById(R.id.avatar);
-        layout.content_pic = (ImageView) view.findViewById(R.id.content_pic);
-        layout.repost_pic = (ImageView) view.findViewById(R.id.repost_content_pic);
-
-        layout.content_pic_pb = (ProgressBar) view.findViewById(R.id.content_pic_pb);
-        layout.repost_pic_pb = (ProgressBar) view.findViewById(R.id.repost_content_pic_pb);
-
         view.findViewById(R.id.first).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -223,13 +242,6 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
                 startActivity(intent);
             }
         });
-
-        layout.content_pic.setOnClickListener(picOnClickListener);
-        layout.repost_pic.setOnClickListener(picOnClickListener);
-
-        layout.repost_layout = (RelativeLayout) view.findViewById(R.id.repost_layout);
-        layout.pic_layout = (FrameLayout) view.findViewById(R.id.pic_layout);
-
         layout.recontent.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -240,7 +252,6 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
                 boolean isDeleted = msg.getRetweeted_status() == null || msg.getRetweeted_status().getUser() == null;
 
                 if (isNotLink && !isDeleted) {
-
                     Intent intent = new Intent(getActivity(), BrowserWeiboMsgActivity.class);
                     intent.putExtra("token", GlobalContext.getInstance().getSpecialToken());
                     intent.putExtra("msg", msg.getRetweeted_status());
@@ -251,7 +262,6 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
 
             }
         });
-        layout.repost_pic_layout = (FrameLayout) view.findViewById(R.id.repost_pic_layout);
     }
 
     public void buildViewData(final boolean refreshPic) {
@@ -259,8 +269,8 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
             layout.username.setText(msg.getUser().getScreen_name());
             ((AbstractAppActivity) getActivity()).getBitmapDownloader().downloadAvatar(layout.avatar, msg.getUser());
         }
-        layout.content.setText(msg.getText());
-        ListViewTool.addLinks(layout.content);
+        layout.content.setText(msg.getListViewSpannableString());
+        layout.content.setMovementMethod(LongClickableLinkMovementMethod.getInstance());
 
         layout.time.setText(msg.getTimeInFormat());
 
@@ -297,14 +307,12 @@ public class BrowserWeiboMsgFragment extends AbstractAppFragment {
 
             layout.repost_layout.setVisibility(View.VISIBLE);
             layout.recontent.setVisibility(View.VISIBLE);
+            layout.recontent.setMovementMethod(LongClickableLinkMovementMethod.getInstance());
             if (repostMsg.getUser() != null) {
-                layout.recontent.setText("@" + repostMsg.getUser().getScreen_name() + "：" + repostMsg.getText());
-                ListViewTool.addLinks(layout.recontent);
+                layout.recontent.setText(repostMsg.getListViewSpannableString());
                 buildRepostCount();
             } else {
-                layout.recontent.setText(repostMsg.getText());
-                ListViewTool.addLinks(layout.recontent);
-
+                layout.recontent.setText(repostMsg.getListViewSpannableString());
             }
             if (!TextUtils.isEmpty(repostMsg.getBmiddle_pic())) {
                 layout.repost_pic_layout.setVisibility(View.VISIBLE);

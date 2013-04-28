@@ -23,6 +23,7 @@ public class FileManager {
     private static final String EMOTION = "emotion";
     private static final String TXT2PIC = "txt2pic";
     private static final String WEBVIEW_FAVICON = "favicon";
+    private static final String LOG = "log";
 
     private static String getSdCardPath() {
         if (isExternalStorageMounted()) {
@@ -62,6 +63,18 @@ public class FileManager {
             return getSdCardPath() + File.separator + "upload.jpg";
     }
 
+    public static String getLogDir() {
+        if (!isExternalStorageMounted())
+            return "";
+        else {
+            String path = getSdCardPath() + File.separator + LOG;
+            if (!new File(path).exists()) {
+                new File(path).mkdirs();
+            }
+            return path;
+        }
+    }
+
     public static String getFilePathFromUrl(String url, FileLocationMethod method) {
 
         if (!isExternalStorageMounted())
@@ -79,23 +92,23 @@ public class FileManager {
         String newRelativePath = "";
         switch (method) {
             case avatar_small:
-                newRelativePath = File.separator + AVATAR_SMAll + oldRelativePath;
+                newRelativePath = AVATAR_SMAll + oldRelativePath;
                 break;
             case avatar_large:
-                newRelativePath = File.separator + AVATAR_LARGE + oldRelativePath;
+                newRelativePath = AVATAR_LARGE + oldRelativePath;
                 break;
             case picture_thumbnail:
-                newRelativePath = File.separator + PICTURE_THUMBNAIL + oldRelativePath;
+                newRelativePath = PICTURE_THUMBNAIL + oldRelativePath;
                 break;
             case picture_bmiddle:
-                newRelativePath = File.separator + PICTURE_BMIDDLE + oldRelativePath;
+                newRelativePath = PICTURE_BMIDDLE + oldRelativePath;
                 break;
             case picture_large:
-                newRelativePath = File.separator + PICTURE_LARGE + oldRelativePath;
+                newRelativePath = PICTURE_LARGE + oldRelativePath;
                 break;
             case emotion:
                 String name = new File(oldRelativePath).getName();
-                newRelativePath = File.separator + EMOTION + File.separator + name;
+                newRelativePath = EMOTION + File.separator + name;
                 break;
         }
 

@@ -1,14 +1,14 @@
 package org.qii.weiciyuan.ui.browser;
 
 import android.app.ActionBar;
-import android.app.Fragment;
-import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.view.ViewPager;
 import android.view.*;
 import android.widget.ShareActionProvider;
@@ -91,7 +91,7 @@ public class BrowserWeiboMsgActivity extends AbstractAppActivity implements Remo
 
     private void buildViewPager() {
         mViewPager = (MyViewPager) findViewById(R.id.viewpager);
-        TimeLinePagerAdapter adapter = new TimeLinePagerAdapter(getFragmentManager());
+        TimeLinePagerAdapter adapter = new TimeLinePagerAdapter(getSupportFragmentManager());
         mViewPager.setOverScrollMode(View.OVER_SCROLL_NEVER);
         mViewPager.setOffscreenPageLimit(3);
         mViewPager.setAdapter(adapter);
@@ -119,7 +119,8 @@ public class BrowserWeiboMsgActivity extends AbstractAppActivity implements Remo
         actionBar.addTab(actionBar.newTab()
                 .setText(getString(R.string.repost))
                 .setTabListener(tabListener));
-
+        Utility.buildTabCount(getActionBar().getTabAt(1), getString(R.string.comments), msg.getComments_count());
+        Utility.buildTabCount(getActionBar().getTabAt(2), getString(R.string.repost), msg.getReposts_count());
     }
 
     ViewPager.SimpleOnPageChangeListener onPageChangeListener = new ViewPager.SimpleOnPageChangeListener() {
@@ -138,17 +139,17 @@ public class BrowserWeiboMsgActivity extends AbstractAppActivity implements Remo
 
 
     private AbstractTimeLineFragment getRepostFragment() {
-        return ((AbstractTimeLineFragment) getFragmentManager().findFragmentByTag(
+        return ((AbstractTimeLineFragment) getSupportFragmentManager().findFragmentByTag(
                 RepostsByIdTimeLineFragment.class.getName()));
     }
 
     private AbstractTimeLineFragment getCommentFragment() {
-        return ((AbstractTimeLineFragment) getFragmentManager().findFragmentByTag(
+        return ((AbstractTimeLineFragment) getSupportFragmentManager().findFragmentByTag(
                 CommentsByIdTimeLineFragment.class.getName()));
     }
 
     private Fragment getBrowserWeiboMsgFragment() {
-        return getFragmentManager().findFragmentByTag(BrowserWeiboMsgFragment.class.getName());
+        return getSupportFragmentManager().findFragmentByTag(BrowserWeiboMsgFragment.class.getName());
     }
 
     ActionBar.TabListener tabListener = new ActionBar.TabListener() {
@@ -336,6 +337,19 @@ public class BrowserWeiboMsgActivity extends AbstractAppActivity implements Remo
         }
     }
 
+    public void updateCommentCount(int count) {
+        msg.setComments_count(count);
+        Intent intent = new Intent();
+        intent.putExtra("msg", msg);
+        setResult(0, intent);
+    }
+
+    public void updateRepostCount(int count) {
+        msg.setReposts_count(count);
+        Intent intent = new Intent();
+        intent.putExtra("msg", msg);
+        setResult(0, intent);
+    }
 
     public String getToken() {
         return token;

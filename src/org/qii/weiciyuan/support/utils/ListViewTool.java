@@ -9,7 +9,7 @@ import android.text.style.URLSpan;
 import android.text.util.Linkify;
 import android.widget.TextView;
 import org.qii.weiciyuan.bean.*;
-import org.qii.weiciyuan.support.lib.MyLinkMovementMethod;
+import org.qii.weiciyuan.support.lib.LongClickableLinkMovementMethod;
 import org.qii.weiciyuan.support.lib.MyURLSpan;
 import org.qii.weiciyuan.support.lib.WeiboPatterns;
 
@@ -31,7 +31,7 @@ public class ListViewTool {
         CharSequence content = view.getText();
         view.setText(convertNormalStringToSpannableString(content.toString()));
         if (view.getLinksClickable()) {
-            view.setMovementMethod(MyLinkMovementMethod.getInstance());
+            view.setMovementMethod(LongClickableLinkMovementMethod.getInstance());
         }
     }
 
@@ -96,11 +96,13 @@ public class ListViewTool {
         if (bean.getStatus() != null) {
             bean.getStatus().setListViewSpannableString(buildOriWeiboSpannalString(bean.getStatus()));
         }
+
+        if (bean.getReply_comment() != null) {
+            addJustHighLightLinksOnlyReplyComment(bean.getReply_comment());
+        }
     }
 
-    public static void addJustHighLightLinksOnlyReplyComment(CommentBean bean) {
-
-
+    private static void addJustHighLightLinksOnlyReplyComment(CommentBean bean) {
         String name = "";
         UserBean reUser = bean.getUser();
         if (reUser != null) {
@@ -115,7 +117,7 @@ public class ListViewTool {
             value = ListViewTool.convertNormalStringToSpannableString(bean.getText());
         }
 
-        bean.setListViewReplySpannableString(value);
+        bean.setListViewSpannableString(value);
     }
 
     public static void addJustHighLightLinks(DMUserBean bean) {

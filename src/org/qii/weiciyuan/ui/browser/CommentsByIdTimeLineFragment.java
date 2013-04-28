@@ -24,12 +24,9 @@ import org.qii.weiciyuan.dao.send.CommentNewMsgDao;
 import org.qii.weiciyuan.dao.timeline.CommentsTimeLineByIdDao;
 import org.qii.weiciyuan.support.error.WeiboException;
 import org.qii.weiciyuan.support.lib.MyAsyncTask;
-import org.qii.weiciyuan.support.lib.pulltorefresh.PullToRefreshBase;
-import org.qii.weiciyuan.support.lib.pulltorefresh.PullToRefreshListView;
 import org.qii.weiciyuan.support.utils.AppConfig;
 import org.qii.weiciyuan.support.utils.GlobalContext;
 import org.qii.weiciyuan.support.utils.Utility;
-import org.qii.weiciyuan.ui.actionmenu.CommentByIdFloatingMenu;
 import org.qii.weiciyuan.ui.actionmenu.CommentByIdSingleChoiceModeLinstener;
 import org.qii.weiciyuan.ui.adapter.CommentListAdapter;
 import org.qii.weiciyuan.ui.basefragment.AbstractTimeLineFragment;
@@ -82,7 +79,7 @@ public class CommentsByIdTimeLineFragment extends AbstractTimeLineFragment<Comme
         if ((bean == null || bean.getItemList().size() == 0) && newTask == null) {
             if (pullToRefreshListView != null) {
                 pullToRefreshListView.startRefreshNow();
-                refresh();
+                loadNewMsg();
             }
         }
     }
@@ -144,31 +141,6 @@ public class CommentsByIdTimeLineFragment extends AbstractTimeLineFragment<Comme
         }
 
 
-        getListView().setChoiceMode(AbsListView.CHOICE_MODE_SINGLE);
-        getListView().setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override
-            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                if (position - 1 < getList().getSize() && position - 1 >= 0) {
-                    if (mActionMode != null) {
-                        mActionMode.finish();
-                        mActionMode = null;
-                        getListView().setItemChecked(position, true);
-                        timeLineAdapter.notifyDataSetChanged();
-                        mActionMode = getActivity().startActionMode(new CommentByIdSingleChoiceModeLinstener(getListView(), timeLineAdapter, CommentsByIdTimeLineFragment.this, quick_repost, bean.getItemList().get(position - 1)));
-                        return true;
-                    } else {
-                        getListView().setItemChecked(position, true);
-                        timeLineAdapter.notifyDataSetChanged();
-                        mActionMode = getActivity().startActionMode(new CommentByIdSingleChoiceModeLinstener(getListView(), timeLineAdapter, CommentsByIdTimeLineFragment.this, quick_repost, bean.getItemList().get(position - 1)));
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-        }
-
-        );
     }
 
 
@@ -185,63 +157,51 @@ public class CommentsByIdTimeLineFragment extends AbstractTimeLineFragment<Comme
     public View onCreateView(LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.commentsbyidtimelinefragment_layout, container, false);
-        empty = (TextView) view.findViewById(R.id.empty);
-        progressBar = (ProgressBar) view.findViewById(R.id.progressbar);
+        buildLayout(inflater, view);
         quick_repost = (LinearLayout) view.findViewById(R.id.quick_repost);
-        pullToRefreshListView = (PullToRefreshListView) view.findViewById(R.id.listView);
-        pullToRefreshListView.setOnRefreshListener(new PullToRefreshBase.OnRefreshListener<ListView>() {
-            @Override
-            public void onRefresh(PullToRefreshBase<ListView> refreshView) {
-                refresh();
-
-            }
-        });
-        pullToRefreshListView.setOnLastItemVisibleListener(new PullToRefreshBase.OnLastItemVisibleListener() {
-            @Override
-            public void onLastItemVisible() {
-                listViewFooterViewClick(null);
-            }
-        });
-        getListView().setScrollingCacheEnabled(false);
-
-        getListView().setHeaderDividersEnabled(false);
-
-        footerView = inflater.inflate(R.layout.listview_footer_layout, null);
-        getListView().addFooterView(footerView);
-        dismissFooterView();
-
-        getListView().setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                if (mActionMode != null) {
-                    getListView().clearChoices();
-                    mActionMode.finish();
-                    mActionMode = null;
-                    return;
-                }
-                getListView().clearChoices();
-                if (position - 1 < getList().getItemList().size() && position - 1 >= 0) {
-                    listViewItemClick(parent, view, position - 1, id);
-                } else if (position - 1 >= getList().getItemList().size()) {
-                    listViewFooterViewClick(view);
-                }
-            }
-        });
-
         et = (EditText) view.findViewById(R.id.content);
+        return view;
+    }
+
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         view.findViewById(R.id.send).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 sendComment();
             }
         });
-        buildListAdapter();
-        return view;
+        getListView().setChoiceMode(AbsListView.CHOICE_MODE_SINGLE);
+        getListView().setOnItemLongClickListener(onItemLongClickListener);
     }
+
+    private AdapterView.OnItemLongClickListener onItemLongClickListener = new AdapterView.OnItemLongClickListener() {
+        @Override
+        public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+            if (position - 1 < getList().getSize() && position - 1 >= 0) {
+                if (mActionMode != null) {
+                    mActionMode.finish();
+                    mActionMode = null;
+                    getListView().setItemChecked(position, true);
+                    timeLineAdapter.notifyDataSetChanged();
+                    mActionMode = getActivity().startActionMode(new CommentByIdSingleChoiceModeLinstener(getListView(), timeLineAdapter, CommentsByIdTimeLineFragment.this, quick_repost, bean.getItemList().get(position - 1)));
+                    return true;
+                } else {
+                    getListView().setItemChecked(position, true);
+                    timeLineAdapter.notifyDataSetChanged();
+                    mActionMode = getActivity().startActionMode(new CommentByIdSingleChoiceModeLinstener(getListView(), timeLineAdapter, CommentsByIdTimeLineFragment.this, quick_repost, bean.getItemList().get(position - 1)));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+    };
 
     @Override
     protected void buildListAdapter() {
-        timeLineAdapter = new CommentListAdapter(this, ((AbstractAppActivity) getActivity()).getBitmapDownloader(), getList().getItemList(), getListView(), false);
+        timeLineAdapter = new CommentListAdapter(this, ((AbstractAppActivity) getActivity()).getBitmapDownloader(), getList().getItemList(), getListView(), false, false);
         pullToRefreshListView.setAdapter(timeLineAdapter);
     }
 
@@ -379,7 +339,7 @@ public class CommentsByIdTimeLineFragment extends AbstractTimeLineFragment<Comme
             progressFragment.dismissAllowingStateLoss();
             if (s != null) {
                 et.setText("");
-                refresh();
+                loadNewMsg();
             } else {
                 Toast.makeText(getActivity(), getString(R.string.send_failed), Toast.LENGTH_SHORT).show();
             }
@@ -391,8 +351,8 @@ public class CommentsByIdTimeLineFragment extends AbstractTimeLineFragment<Comme
 
     protected void listViewItemClick(AdapterView parent, View view, int position, long id) {
 
-        CommentByIdFloatingMenu menu = new CommentByIdFloatingMenu(getList().getItem(position));
-        menu.show(getFragmentManager(), "");
+//        CommentByIdFloatingMenu menu = new CommentByIdFloatingMenu(getList().getItem(position));
+//        menu.show(getFragmentManager(), "");
     }
 
 
@@ -455,9 +415,8 @@ public class CommentsByIdTimeLineFragment extends AbstractTimeLineFragment<Comme
         Activity activity = getActivity();
         if (activity != null) {
             ActionBar.Tab tab = activity.getActionBar().getTabAt(1);
-            String num = getString(R.string.comments) + "(" + bean.getTotal_number() + ")";
-            tab.setText(num);
-
+            Utility.buildTabCount(tab, getString(R.string.comments), bean.getTotal_number());
+            ((BrowserWeiboMsgActivity) activity).updateCommentCount(bean.getTotal_number());
         }
     }
 
