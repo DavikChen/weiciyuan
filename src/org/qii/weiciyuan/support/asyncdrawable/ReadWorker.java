@@ -54,6 +54,15 @@ public class ReadWorker extends MyAsyncTask<String, Void, Bitmap> implements IPi
         if (isCancelled())
             return null;
 
+        synchronized (TimeLineBitmapDownloader.pauseWorkLock) {
+            while (TimeLineBitmapDownloader.pauseWork && !isCancelled()) {
+                try {
+                    TimeLineBitmapDownloader.pauseWorkLock.wait();
+                } catch (InterruptedException e) {
+                }
+            }
+        }
+
         String path = FileManager.getFilePathFromUrl(data, method);
 
         boolean downloaded = TaskCache.waitForPictureDownload(data, path, method);
@@ -90,7 +99,14 @@ public class ReadWorker extends MyAsyncTask<String, Void, Bitmap> implements IPi
                 width = (int) (metrics.widthPixels - (14 + 14) * reSize);
         }
 
-
+        synchronized (TimeLineBitmapDownloader.pauseWorkLock) {
+            while (TimeLineBitmapDownloader.pauseWork && !isCancelled()) {
+                try {
+                    TimeLineBitmapDownloader.pauseWorkLock.wait();
+                } catch (InterruptedException e) {
+                }
+            }
+        }
         Bitmap bitmap = ImageTool.getRoundedCornerPic(path, width, height);
         if (bitmap == null) {
             this.failedResult = FailedResult.readFailed;

@@ -14,6 +14,7 @@ import org.qii.weiciyuan.bean.ItemBean;
 import org.qii.weiciyuan.bean.ListBean;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -26,7 +27,18 @@ public class TopTipBar extends TextView {
     private boolean disappear = false;
     private Runnable lastRunnable;
     private boolean error;
+    private OnChangeListener onChangeListener;
 
+    public static interface OnChangeListener {
+        public void onChange(int count);
+
+    }
+
+    public void setOnChangeListener(OnChangeListener l) {
+        this.onChangeListener = l;
+        this.onChangeListener.onChange(ids.size());
+
+    }
 
     public TopTipBar(Context context) {
         this(context, null);
@@ -63,6 +75,11 @@ public class TopTipBar extends TextView {
         setCount();
         if (disappear) {
             disappear(3000);
+            ids.clear();
+        }
+
+        if (this.onChangeListener != null) {
+            this.onChangeListener.onChange(ids.size());
         }
     }
 
@@ -97,6 +114,7 @@ public class TopTipBar extends TextView {
 
 
     private void setCount() {
+
         this.error = false;
         int count = ids.size();
         if (count > 0) {
@@ -123,11 +141,27 @@ public class TopTipBar extends TextView {
         boolean has = ids.contains(id);
         if (has) {
             ids.remove(id);
+            long d = Long.valueOf(id);
+            Iterator<String> iterator = ids.iterator();
+            while (iterator.hasNext()) {
+                String v = iterator.next();
+                long t = Long.valueOf(v);
+                if (t < d) {
+                    iterator.remove();
+                }
+            }
             setCount();
+
+            if (this.onChangeListener != null) {
+                this.onChangeListener.onChange(ids.size());
+            }
         }
         if (ids.contains(helperId)) {
             setCount();
+        } else {
+            setVisibility(View.INVISIBLE);
         }
+
     }
 
     public void clearAndReset() {
@@ -136,6 +170,9 @@ public class TopTipBar extends TextView {
         }
         ids.clear();
         disappear(0);
+        if (this.onChangeListener != null) {
+            this.onChangeListener.onChange(ids.size());
+        }
     }
 
     public void setError(String error) {

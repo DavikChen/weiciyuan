@@ -62,15 +62,23 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
     private final int TYPE_MIDDLE = 2;
     private final int TYPE_SIMPLE = 3;
 
+    public static final int NO_ITEM_ID = -1;
+
     private Set<Integer> tagIndexList = new HashSet<Integer>();
 
-    private ArrayDeque<PrefView> prefNormalViews = new ArrayDeque<PrefView>(6);
-    private ArrayDeque<PrefView> prefBigPicViews = new ArrayDeque<PrefView>(6);
+    private static final int PREF_LISTVIEW_ITEM_VIEW_COUNT = 6;
+    private ArrayDeque<PrefView> prefNormalViews = new ArrayDeque<PrefView>(PREF_LISTVIEW_ITEM_VIEW_COUNT);
+    private ArrayDeque<PrefView> prefBigPicViews = new ArrayDeque<PrefView>(PREF_LISTVIEW_ITEM_VIEW_COUNT);
 
+    private int savedCurrentMiddleLoadingViewPosition = AbstractTimeLineFragment.NO_SAVED_CURRENT_LOADING_MSG_VIEW_POSITION;
 
     private class PrefView {
         View view;
         ViewHolder holder;
+    }
+
+    public void setSavedMiddleLoadingViewPosition(int position) {
+        savedCurrentMiddleLoadingViewPosition = position;
     }
 
     public AbstractAppListAdapter(Fragment fragment, TimeLineBitmapDownloader commander, List<T> bean, ListView listView, boolean showOriStatus) {
@@ -96,14 +104,14 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
         checkedBG = ta.getColor(0, 430);
 
         if (pre) {
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < PREF_LISTVIEW_ITEM_VIEW_COUNT; i++) {
                 PrefView prefView = new PrefView();
                 prefView.view = initNormalLayout(null);
                 prefView.holder = buildHolder(prefView.view);
                 prefNormalViews.add(prefView);
             }
 
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < PREF_LISTVIEW_ITEM_VIEW_COUNT; i++) {
                 PrefView prefView = new PrefView();
                 prefView.view = initBigPicLayout(null);
                 prefView.holder = buildHolder(prefView.view);
@@ -124,33 +132,42 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
 
                     if (holder != null) {
                         Drawable drawable = holder.avatar.getImageView().getDrawable();
-                        if (!(drawable instanceof PictureBitmapDrawable)) {
-                            drawable.setCallback(null);
-                            holder.avatar.setImageBitmap(null);
-                            holder.avatar.getImageView().clearAnimation();
-                        }
+                        clearAvatarBitmap(holder, drawable);
                         drawable = holder.content_pic.getImageView().getDrawable();
-                        if (!(drawable instanceof PictureBitmapDrawable)) {
-                            drawable.setCallback(null);
-                            holder.content_pic.setImageBitmap(null);
-                            holder.content_pic.getImageView().clearAnimation();
-                        }
+                        clearPictureBitmap(holder, drawable);
                         drawable = holder.repost_content_pic.getImageView().getDrawable();
-                        if (!(drawable instanceof PictureBitmapDrawable)) {
-                            drawable.setCallback(null);
-                            holder.repost_content_pic.setImageBitmap(null);
-                            holder.repost_content_pic.getImageView().clearAnimation();
-                        }
-
+                        clearRepostPictureBitmap(holder, drawable);
 
                         if (!tag.equals(index)) {
                             holder.listview_root.removeAllViewsInLayout();
                             holder.listview_root = null;
                             view.setTag(tag, null);
                         }
-
-
                     }
+                }
+            }
+
+            void clearAvatarBitmap(ViewHolder holder, Drawable drawable) {
+                if (!(drawable instanceof PictureBitmapDrawable)) {
+                    drawable.setCallback(null);
+                    holder.avatar.setImageBitmap(null);
+                    holder.avatar.getImageView().clearAnimation();
+                }
+            }
+
+            void clearPictureBitmap(ViewHolder holder, Drawable drawable) {
+                if (!(drawable instanceof PictureBitmapDrawable)) {
+                    drawable.setCallback(null);
+                    holder.content_pic.setImageBitmap(null);
+                    holder.content_pic.getImageView().clearAnimation();
+                }
+            }
+
+            void clearRepostPictureBitmap(ViewHolder holder, Drawable drawable) {
+                if (!(drawable instanceof PictureBitmapDrawable)) {
+                    drawable.setCallback(null);
+                    holder.repost_content_pic.setImageBitmap(null);
+                    holder.repost_content_pic.getImageView().clearAnimation();
                 }
             }
         });
@@ -258,6 +275,11 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
             configViewFont(holder);
             bindViewData(holder, position);
             bindOnTouchListener(holder);
+        } else {
+            if (savedCurrentMiddleLoadingViewPosition == position + listView.getHeaderViewsCount()) {
+                ListViewMiddleMsgLoadingView loadingView = (ListViewMiddleMsgLoadingView) convertView;
+                loadingView.load();
+            }
         }
         return convertView;
     }
@@ -425,7 +447,7 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
         if (getList() != null && getList().get(position) != null && getList().size() > 0 && position < getList().size())
             return Long.valueOf(getList().get(position).getId());
         else
-            return -1;
+            return NO_ITEM_ID;
     }
 
     protected void buildAvatar(TimeLineAvatarImageView view, int position, final UserBean user) {

@@ -27,6 +27,7 @@ import org.qii.weiciyuan.ui.preference.SettingActivity;
 import org.qii.weiciyuan.ui.search.SearchMainActivity;
 import org.qii.weiciyuan.ui.userinfo.MyInfoActivity;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 
 /**
@@ -39,10 +40,36 @@ public class LeftMenuFragment extends AbstractAppFragment {
 
     private int currentIndex = -1;
 
+    private int mentionsWeiboUnreadCount = 0;
+    private int mentionsCommentUnreadCount = 0;
+    private int commentsToMeUnreadCount = 0;
+
+    public int commentsTabIndex = -1;
+    public int mentionsTabIndex = -1;
+
+    private boolean firstStart = true;
+
+    private ArrayList<Fragment> rightFragments = new ArrayList<Fragment>();
+
+    private static final int HOME_INDEX = 0;
+    private static final int MENTIONS_INDEX = 1;
+    private static final int COMMENTS_INDEX = 2;
+
+    @Override
+    public void onPause() {
+        super.onPause();
+    }
+
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt("currentIndex", currentIndex);
+        outState.putInt("mentionsWeiboUnreadCount", mentionsWeiboUnreadCount);
+        outState.putInt("mentionsCommentUnreadCount", mentionsCommentUnreadCount);
+        outState.putInt("commentsToMeUnreadCount", commentsToMeUnreadCount);
+        outState.putInt("commentsTabIndex", commentsTabIndex);
+        outState.putInt("mentionsTabIndex", mentionsTabIndex);
+        outState.putBoolean("firstStart", firstStart);
     }
 
     @Override
@@ -50,10 +77,24 @@ public class LeftMenuFragment extends AbstractAppFragment {
         super.onActivityCreated(savedInstanceState);
         if (savedInstanceState != null) {
             currentIndex = savedInstanceState.getInt("currentIndex");
+            mentionsWeiboUnreadCount = savedInstanceState.getInt("mentionsWeiboUnreadCount");
+            mentionsCommentUnreadCount = savedInstanceState.getInt("mentionsCommentUnreadCount");
+            commentsToMeUnreadCount = savedInstanceState.getInt("commentsToMeUnreadCount");
+            commentsTabIndex = savedInstanceState.getInt("commentsTabIndex");
+            mentionsTabIndex = savedInstanceState.getInt("mentionsTabIndex");
+            firstStart = savedInstanceState.getBoolean("firstStart");
+        } else {
+            readUnreadCountFromDB();
         }
         if (currentIndex == -1) {
             currentIndex = GlobalContext.getInstance().getAccountBean().getNavigationPosition() / 10;
         }
+
+
+        rightFragments.add(HOME_INDEX, ((MainTimeLineActivity) getActivity()).getFriendsTimeLineFragment());
+        rightFragments.add(MENTIONS_INDEX, ((MainTimeLineActivity) getActivity()).getMentionsTimeLineFragment());
+        rightFragments.add(COMMENTS_INDEX, ((MainTimeLineActivity) getActivity()).getCommentsTimeLineFragment());
+
 
         switch (currentIndex) {
             case 0:
@@ -69,26 +110,33 @@ public class LeftMenuFragment extends AbstractAppFragment {
         drawButtonsBackground(currentIndex);
 
         buildUnreadCount();
+
+        firstStart = false;
     }
 
-    private void buildUnreadCount() {
-        int mentionsCount = 0;
+    private void readUnreadCountFromDB() {
         TimeLinePosition position = MentionsTimeLineDBTask.getPosition(GlobalContext.getInstance().getCurrentAccountId());
         HashSet<String> hashSet = position.newMsgIds;
         if (hashSet != null) {
-            mentionsCount += hashSet.size();
+            mentionsWeiboUnreadCount = hashSet.size();
         }
+
         position = MentionCommentsTimeLineDBTask.getPosition(GlobalContext.getInstance().getCurrentAccountId());
         hashSet = position.newMsgIds;
         if (hashSet != null) {
-            mentionsCount += hashSet.size();
+            mentionsCommentUnreadCount = hashSet.size();
         }
-        setMentionWeiboUnreadCount(mentionsCount);
         position = CommentsTimeLineDBTask.getPosition(GlobalContext.getInstance().getCurrentAccountId());
         hashSet = position.newMsgIds;
         if (hashSet != null) {
-            setCommentUnreadCount(hashSet.size());
+            commentsToMeUnreadCount = hashSet.size();
         }
+    }
+
+    private void buildUnreadCount() {
+        setMentionWeiboUnreadCount(mentionsWeiboUnreadCount);
+        setMentionCommentUnreadCount(mentionsCommentUnreadCount);
+        setCommentUnreadCount(commentsToMeUnreadCount);
     }
 
     private void openMyProfile() {
@@ -130,19 +178,14 @@ public class LeftMenuFragment extends AbstractAppFragment {
         currentIndex = 0;
 
         FragmentTransaction ft = getFragmentManager().beginTransaction();
-        ft.hide(((MainTimeLineActivity) getActivity()).getMentionsTimeLineFragment());
-        ft.hide(((MainTimeLineActivity) getActivity()).getCommentsTimeLineFragment());
-        FriendsTimeLineFragment fragment = ((MainTimeLineActivity) getActivity()).getFriendsTimeLineFragment();
-
-        if (fragment.isAdded() && fragment.isHidden()) {
-            ft.show(fragment);
-        } else if (!fragment.isAdded()) {
-            ft.add(R.id.menu_right_fl, fragment, FriendsTimeLineFragment.class.getName());
-        }
-
+        ft.hide(rightFragments.get(MENTIONS_INDEX));
+        ft.hide(rightFragments.get(COMMENTS_INDEX));
+        FriendsTimeLineFragment fragment = (FriendsTimeLineFragment) rightFragments.get(HOME_INDEX);
+        ft.show(fragment);
         ft.commit();
         ((MainTimeLineActivity) getActivity()).getSlidingMenu().showContent();
         setTitle("");
+        ((MainTimeLineActivity) getActivity()).setCurrentFragment(fragment);
         return false;
     }
 
@@ -155,31 +198,25 @@ public class LeftMenuFragment extends AbstractAppFragment {
         getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_MARGIN);
 
         FragmentTransaction ft = getFragmentManager().beginTransaction();
-
-        Fragment fragment = ((MainTimeLineActivity) getActivity()).getFriendsTimeLineFragment();
-
-        ft.hide(fragment);
-        ft.hide(((MainTimeLineActivity) getActivity()).getCommentsTimeLineFragment());
+        ft.hide(rightFragments.get(HOME_INDEX));
+        ft.hide(rightFragments.get(COMMENTS_INDEX));
 
         currentIndex = 1;
 
-        MentionsTimeLine m = ((MainTimeLineActivity) getActivity()).getMentionsTimeLineFragment();
+        MentionsTimeLine m = (MentionsTimeLine) rightFragments.get(MENTIONS_INDEX);
 
-        if (m.isAdded() && m.isHidden()) {
-            ft.show(m);
-        } else if (!m.isAdded()) {
-            ft.attach(m);
-            ft.add(R.id.menu_right_fl, m, MentionsTimeLine.class.getName());
-        }
-
+        ft.show(m);
         ft.commit();
-        int tabIndex = 0;
-        int navPosition = GlobalContext.getInstance().getAccountBean().getNavigationPosition() / 10;
-        if (navPosition == 1) {
-            tabIndex = GlobalContext.getInstance().getAccountBean().getNavigationPosition() % 10;
+
+        if (firstStart) {
+            int navPosition = GlobalContext.getInstance().getAccountBean().getNavigationPosition() / 10;
+            if (navPosition == 1) {
+                mentionsTabIndex = GlobalContext.getInstance().getAccountBean().getNavigationPosition() % 10;
+            }
         }
-        m.buildActionBarAndViewPagerTitles(getActivity().getActionBar(), R.string.mentions_weibo, R.string.mentions_to_me, tabIndex);
+        m.buildActionBarAndViewPagerTitles(getActivity().getActionBar(), R.string.mentions_weibo, R.string.mentions_weibo, mentionsTabIndex);
         ((MainTimeLineActivity) getActivity()).getSlidingMenu().showContent();
+        ((MainTimeLineActivity) getActivity()).setCurrentFragment(m);
         if (Utility.isDevicePort()) {
             setTitle(R.string.mentions);
         }
@@ -191,6 +228,7 @@ public class LeftMenuFragment extends AbstractAppFragment {
         return currentIndex;
     }
 
+
     private boolean showCommentPage(boolean reset) {
         getActivity().getActionBar().setDisplayShowTitleEnabled(true);
         if (currentIndex == 2 && !reset) {
@@ -199,28 +237,23 @@ public class LeftMenuFragment extends AbstractAppFragment {
         }
         currentIndex = 2;
         FragmentTransaction ft = getFragmentManager().beginTransaction();
-        Fragment friendsTimeLineFragment = ((MainTimeLineActivity) getActivity()).getFriendsTimeLineFragment();
 
-        ft.hide(friendsTimeLineFragment);
-        ft.hide(((MainTimeLineActivity) getActivity()).getMentionsTimeLineFragment());
+        ft.hide(rightFragments.get(HOME_INDEX));
+        ft.hide(rightFragments.get(MENTIONS_INDEX));
 
-
-        CommentsTimeLine fragment = ((MainTimeLineActivity) getActivity()).getCommentsTimeLineFragment();
-
-        if (fragment.isAdded() && fragment.isHidden()) {
-            ft.show(fragment);
-        } else if (!fragment.isAdded()) {
-            ft.add(R.id.menu_right_fl, fragment, CommentsTimeLine.class.getName());
-        }
-
+        CommentsTimeLine fragment = (CommentsTimeLine) rightFragments.get(COMMENTS_INDEX);
+        ft.show(fragment);
         ft.commit();
-        int tabIndex = 0;
-        int navPosition = GlobalContext.getInstance().getAccountBean().getNavigationPosition() / 10;
-        if (navPosition == 2) {
-            tabIndex = GlobalContext.getInstance().getAccountBean().getNavigationPosition() % 10;
+
+        if (firstStart) {
+            int navPosition = GlobalContext.getInstance().getAccountBean().getNavigationPosition() / 10;
+            if (navPosition == 2) {
+                commentsTabIndex = GlobalContext.getInstance().getAccountBean().getNavigationPosition() % 10;
+            }
         }
-        fragment.buildActionBarAndViewPagerTitles(getActivity().getActionBar(), R.string.all_people_send_to_me, R.string.my_comment, tabIndex);
+        fragment.buildActionBarAndViewPagerTitles(getActivity().getActionBar(), R.string.all_people_send_to_me, R.string.my_comment, commentsTabIndex);
         ((MainTimeLineActivity) getActivity()).getSlidingMenu().showContent();
+        ((MainTimeLineActivity) getActivity()).setCurrentFragment(fragment);
         if (Utility.isDevicePort()) {
             setTitle(R.string.comments);
         }
@@ -372,18 +405,32 @@ public class LeftMenuFragment extends AbstractAppFragment {
     }
 
     public void setMentionWeiboUnreadCount(int count) {
-        if (count > 0) {
+        this.mentionsWeiboUnreadCount = count;
+        int totalCount = this.mentionsWeiboUnreadCount + this.mentionsCommentUnreadCount;
+        if (totalCount > 0) {
             layout.mentionCount.setVisibility(View.VISIBLE);
-            layout.mentionCount.setText(String.valueOf(count));
+            layout.mentionCount.setText(String.valueOf(totalCount));
+        } else {
+            layout.mentionCount.setVisibility(View.GONE);
+        }
+    }
+
+    public void setMentionCommentUnreadCount(int count) {
+        this.mentionsCommentUnreadCount = count;
+        int totalCount = this.mentionsWeiboUnreadCount + this.mentionsCommentUnreadCount;
+        if (totalCount > 0) {
+            layout.mentionCount.setVisibility(View.VISIBLE);
+            layout.mentionCount.setText(String.valueOf(totalCount));
         } else {
             layout.mentionCount.setVisibility(View.GONE);
         }
     }
 
     public void setCommentUnreadCount(int count) {
-        if (count > 0) {
+        this.commentsToMeUnreadCount = count;
+        if (this.commentsToMeUnreadCount > 0) {
             layout.commentCount.setVisibility(View.VISIBLE);
-            layout.commentCount.setText(String.valueOf(count));
+            layout.commentCount.setText(String.valueOf(this.commentsToMeUnreadCount));
         } else {
             layout.commentCount.setVisibility(View.GONE);
         }
@@ -403,4 +450,6 @@ public class LeftMenuFragment extends AbstractAppFragment {
         Button profile;
         Button setting;
     }
+
+
 }

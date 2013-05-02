@@ -1,5 +1,6 @@
 package org.qii.weiciyuan.ui.maintimeline;
 
+import android.app.ActionBar;
 import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -12,11 +13,10 @@ import android.support.v4.content.LocalBroadcastManager;
 import android.view.View;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
+import android.widget.TextView;
 import android.widget.Toast;
-import org.qii.weiciyuan.bean.AccountBean;
-import org.qii.weiciyuan.bean.CommentListBean;
-import org.qii.weiciyuan.bean.UnreadBean;
-import org.qii.weiciyuan.bean.UserBean;
+import org.qii.weiciyuan.R;
+import org.qii.weiciyuan.bean.*;
 import org.qii.weiciyuan.bean.android.AsyncTaskLoaderResult;
 import org.qii.weiciyuan.bean.android.CommentTimeLineData;
 import org.qii.weiciyuan.bean.android.TimeLinePosition;
@@ -24,6 +24,8 @@ import org.qii.weiciyuan.dao.destroy.DestroyCommentDao;
 import org.qii.weiciyuan.support.database.CommentsTimeLineDBTask;
 import org.qii.weiciyuan.support.error.WeiboException;
 import org.qii.weiciyuan.support.lib.MyAsyncTask;
+import org.qii.weiciyuan.support.lib.TopTipBar;
+import org.qii.weiciyuan.support.lib.VelocityListView;
 import org.qii.weiciyuan.support.utils.AppEventAction;
 import org.qii.weiciyuan.support.utils.BundleArgsConstants;
 import org.qii.weiciyuan.support.utils.GlobalContext;
@@ -36,6 +38,7 @@ import org.qii.weiciyuan.ui.interfaces.ICommander;
 import org.qii.weiciyuan.ui.interfaces.IRemoveItem;
 import org.qii.weiciyuan.ui.loader.CommentsToMeDBLoader;
 import org.qii.weiciyuan.ui.loader.CommentsToMeMsgLoader;
+import org.qii.weiciyuan.ui.main.CommentsTimeLine;
 import org.qii.weiciyuan.ui.main.MainTimeLineActivity;
 
 /**
@@ -121,6 +124,14 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
     public void onResume() {
         super.onResume();
         LocalBroadcastManager.getInstance(getActivity()).registerReceiver(newBroadcastReceiver, new IntentFilter(AppEventAction.NEW_MSG_BROADCAST));
+        setActionBarTabCount(newMsgTipBar.getValues().size());
+
+        newMsgTipBar.setOnChangeListener(new TopTipBar.OnChangeListener() {
+            @Override
+            public void onChange(int count) {
+                ((MainTimeLineActivity) getActivity()).setCommentsToMeCount(count);
+            }
+        });
     }
 
     @Override
@@ -144,6 +155,25 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
 //                getPullToRefreshListView().startRefreshNow();
 //            }
 //        }
+    }
+
+    private void setActionBarTabCount(int count) {
+        CommentsTimeLine parent = (CommentsTimeLine) getParentFragment();
+        ActionBar.Tab tab = parent.getCommentsToMeTab();
+        if (tab == null) {
+            return;
+        }
+        String tabTag = (String) tab.getTag();
+        if (CommentsToMeTimeLineFragment.class.getName().equals(tabTag)) {
+            View customView = tab.getCustomView();
+            TextView countTV = (TextView) customView.findViewById(R.id.tv_home_count);
+            countTV.setText(String.valueOf(count));
+            if (count > 0) {
+                countTV.setVisibility(View.VISIBLE);
+            } else {
+                countTV.setVisibility(View.GONE);
+            }
+        }
     }
 
     @Override
@@ -284,8 +314,11 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
     }
 
     private void setListViewUnreadTipBar(TimeLinePosition p) {
-        if (p != null && p.newMsgIds != null)
+        if (p != null && p.newMsgIds != null) {
             newMsgTipBar.setValue(p.newMsgIds);
+            setActionBarTabCount(newMsgTipBar.getValues().size());
+            ((MainTimeLineActivity) getActivity()).setCommentsToMeCount(newMsgTipBar.getValues().size());
+        }
     }
 
 
@@ -360,8 +393,30 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
         }
     }
 
+    protected void middleMsgOnPostExecute(int position, CommentListBean newValue, boolean towardsBottom) {
+
+        if (newValue != null) {
+            int size = newValue.getSize();
+
+            if (getActivity() != null && newValue.getSize() > 0) {
+                getList().addMiddleData(position, newValue, towardsBottom);
+
+                if (towardsBottom) {
+                    getAdapter().notifyDataSetChanged();
+                } else {
+
+                    View v = Utility.getListViewItemViewFromPosition(getListView(), position + 1 + 1);
+                    int top = (v == null) ? 0 : v.getTop();
+                    getAdapter().notifyDataSetChanged();
+                    int ss = position + 1 + size - 1;
+                    getListView().setSelectionFromTop(ss, top);
+                }
+            }
+        }
+    }
+
     @Override
-    public void loadMiddleMsg(String beginId, String endId, String endTag, int position) {
+    public void loadMiddleMsg(String beginId, String endId, int position) {
         getLoaderManager().destroyLoader(NEW_MSG_LOADER_ID);
         getLoaderManager().destroyLoader(OLD_MSG_LOADER_ID);
         getPullToRefreshListView().onRefreshComplete();
@@ -370,8 +425,9 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
         Bundle bundle = new Bundle();
         bundle.putString("beginId", beginId);
         bundle.putString("endId", endId);
-        bundle.putString("endTag", endTag);
         bundle.putInt("position", position);
+        VelocityListView velocityListView = (VelocityListView) getListView();
+        bundle.putBoolean("towardsBottom", velocityListView.getTowardsOrientation() == VelocityListView.TOWARDS_BOTTOM);
         getLoaderManager().restartLoader(MIDDLE_MSG_LOADER_ID, bundle, msgCallback);
 
     }

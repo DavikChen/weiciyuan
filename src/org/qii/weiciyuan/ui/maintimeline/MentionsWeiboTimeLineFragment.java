@@ -1,5 +1,6 @@
 package org.qii.weiciyuan.ui.maintimeline;
 
+import android.app.ActionBar;
 import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -11,6 +12,7 @@ import android.support.v4.content.Loader;
 import android.support.v4.content.LocalBroadcastManager;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.TextView;
 import android.widget.Toast;
 import org.qii.weiciyuan.R;
 import org.qii.weiciyuan.bean.AccountBean;
@@ -24,6 +26,7 @@ import org.qii.weiciyuan.dao.maintimeline.MainMentionsTimeLineDao;
 import org.qii.weiciyuan.support.database.MentionsTimeLineDBTask;
 import org.qii.weiciyuan.support.error.WeiboException;
 import org.qii.weiciyuan.support.lib.TopTipBar;
+import org.qii.weiciyuan.support.lib.VelocityListView;
 import org.qii.weiciyuan.support.utils.AppEventAction;
 import org.qii.weiciyuan.support.utils.BundleArgsConstants;
 import org.qii.weiciyuan.support.utils.GlobalContext;
@@ -35,6 +38,7 @@ import org.qii.weiciyuan.ui.interfaces.ICommander;
 import org.qii.weiciyuan.ui.loader.MentionsWeiboMsgLoader;
 import org.qii.weiciyuan.ui.loader.MentionsWeiboTimeDBLoader;
 import org.qii.weiciyuan.ui.main.MainTimeLineActivity;
+import org.qii.weiciyuan.ui.main.MentionsTimeLine;
 
 /**
  * User: qii
@@ -48,7 +52,7 @@ public class MentionsWeiboTimeLineFragment extends AbstractMessageTimeLineFragme
     private UnreadBean unreadBean;
     private TimeLinePosition timeLinePosition;
     private MessageListBean bean = new MessageListBean();
-
+    private final int POSITION_IN_PARENT_FRAGMENT = 0;
 
     @Override
     public void onDestroy() {
@@ -75,6 +79,16 @@ public class MentionsWeiboTimeLineFragment extends AbstractMessageTimeLineFragme
     public void onResume() {
         super.onResume();
         LocalBroadcastManager.getInstance(getActivity()).registerReceiver(newBroadcastReceiver, new IntentFilter(AppEventAction.NEW_MSG_BROADCAST));
+
+        setActionBarTabCount(newMsgTipBar.getValues().size());
+        getNewMsgTipBar().setOnChangeListener(new TopTipBar.OnChangeListener() {
+            @Override
+            public void onChange(int count) {
+                ((MainTimeLineActivity) getActivity()).setMentionsWeiboCount(count);
+                setActionBarTabCount(count);
+            }
+        });
+
     }
 
     @Override
@@ -130,13 +144,30 @@ public class MentionsWeiboTimeLineFragment extends AbstractMessageTimeLineFragme
         getListView().setAdapter(timeLineAdapter);
     }
 
+
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);
         if (isVisible() && isVisibleToUser) {
-            ((MainTimeLineActivity) getActivity()).setCurrentFragment(this);
-            if (getActivity().getActionBar().getTabAt(0).getText().toString().contains(")")) {
-                getPullToRefreshListView().startRefreshNow();
+//            ((MainTimeLineActivity) getActivity()).setCurrentFragment(this);
+        }
+    }
+
+    private void setActionBarTabCount(int count) {
+        MentionsTimeLine parent = (MentionsTimeLine) getParentFragment();
+        ActionBar.Tab tab = parent.getWeiboTab();
+        if (tab == null) {
+            return;
+        }
+        String tabTag = (String) tab.getTag();
+        if (MentionsWeiboTimeLineFragment.class.getName().equals(tabTag)) {
+            View customView = tab.getCustomView();
+            TextView countTV = (TextView) customView.findViewById(R.id.tv_home_count);
+            countTV.setText(String.valueOf(count));
+            if (count > 0) {
+                countTV.setVisibility(View.VISIBLE);
+            } else {
+                countTV.setVisibility(View.GONE);
             }
         }
     }
@@ -169,6 +200,28 @@ public class MentionsWeiboTimeLineFragment extends AbstractMessageTimeLineFragme
             getListView().setSelectionFromTop(ss + 1, top);
             MentionsTimeLineDBTask.asyncReplace(getList(), accountBean.getUid());
             saveTimeLinePositionToDB();
+        }
+    }
+
+    protected void middleMsgOnPostExecute(int position, MessageListBean newValue, boolean towardsBottom) {
+
+        if (newValue != null) {
+            int size = newValue.getSize();
+
+            if (getActivity() != null && newValue.getSize() > 0) {
+                getList().addMiddleData(position, newValue, towardsBottom);
+
+                if (towardsBottom) {
+                    getAdapter().notifyDataSetChanged();
+                } else {
+
+                    View v = Utility.getListViewItemViewFromPosition(getListView(), position + 1 + 1);
+                    int top = (v == null) ? 0 : v.getTop();
+                    getAdapter().notifyDataSetChanged();
+                    int ss = position + 1 + size - 1;
+                    getListView().setSelectionFromTop(ss, top);
+                }
+            }
         }
     }
 
@@ -233,8 +286,11 @@ public class MentionsWeiboTimeLineFragment extends AbstractMessageTimeLineFragme
     }
 
     private void setListViewUnreadTipBar(TimeLinePosition p) {
-        if (p != null && p.newMsgIds != null)
+        if (p != null && p.newMsgIds != null) {
             newMsgTipBar.setValue(p.newMsgIds);
+            setActionBarTabCount(newMsgTipBar.getValues().size());
+            ((MainTimeLineActivity) getActivity()).setMentionsWeiboCount(newMsgTipBar.getValues().size());
+        }
     }
 
     @Override
@@ -258,7 +314,7 @@ public class MentionsWeiboTimeLineFragment extends AbstractMessageTimeLineFragme
     }
 
     @Override
-    public void loadMiddleMsg(String beginId, String endId, String endTag, int position) {
+    public void loadMiddleMsg(String beginId, String endId, int position) {
         getLoaderManager().destroyLoader(NEW_MSG_LOADER_ID);
         getLoaderManager().destroyLoader(OLD_MSG_LOADER_ID);
         getPullToRefreshListView().onRefreshComplete();
@@ -267,8 +323,9 @@ public class MentionsWeiboTimeLineFragment extends AbstractMessageTimeLineFragme
         Bundle bundle = new Bundle();
         bundle.putString("beginId", beginId);
         bundle.putString("endId", endId);
-        bundle.putString("endTag", endTag);
         bundle.putInt("position", position);
+        VelocityListView velocityListView = (VelocityListView) getListView();
+        bundle.putBoolean("towardsBottom", velocityListView.getTowardsOrientation() == VelocityListView.TOWARDS_BOTTOM);
         getLoaderManager().restartLoader(MIDDLE_MSG_LOADER_ID, bundle, msgCallback);
 
     }

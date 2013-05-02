@@ -8,8 +8,5 @@
         android:right="14dp"
         android:bottom="14dp"/>
 
-    <stroke
-        android:width="18dp"
-        android:color="@color/host_background"/>
 
 </shape>

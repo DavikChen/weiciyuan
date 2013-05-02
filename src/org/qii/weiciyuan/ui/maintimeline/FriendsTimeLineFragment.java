@@ -18,11 +18,13 @@ import org.qii.weiciyuan.dao.maintimeline.TimeLineReCmtCountDao;
 import org.qii.weiciyuan.support.database.FriendsTimeLineDBTask;
 import org.qii.weiciyuan.support.error.WeiboException;
 import org.qii.weiciyuan.support.lib.MyAsyncTask;
+import org.qii.weiciyuan.support.lib.VelocityListView;
 import org.qii.weiciyuan.support.settinghelper.SettingUtility;
 import org.qii.weiciyuan.support.utils.AppConfig;
 import org.qii.weiciyuan.support.utils.BundleArgsConstants;
 import org.qii.weiciyuan.support.utils.GlobalContext;
 import org.qii.weiciyuan.support.utils.Utility;
+import org.qii.weiciyuan.ui.adapter.AbstractAppListAdapter;
 import org.qii.weiciyuan.ui.adapter.StatusListAdapter;
 import org.qii.weiciyuan.ui.basefragment.AbstractMessageTimeLineFragment;
 import org.qii.weiciyuan.ui.browser.BrowserWeiboMsgActivity;
@@ -42,7 +44,9 @@ import java.util.concurrent.TimeUnit;
  * User: qii
  * Date: 12-7-29
  */
-public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<MessageListBean> implements GlobalContext.MyProfileInfoChangeListener {
+public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<MessageListBean>
+        implements GlobalContext.MyProfileInfoChangeListener,
+        MainTimeLineActivity.ScrollableListFragment {
 
     private AccountBean accountBean;
     private UserBean userBean;
@@ -136,7 +140,11 @@ public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<Mes
     }
 
     private void savePositionToDB() {
-        final TimeLinePosition position = positionCache.get(currentGroupId);
+        TimeLinePosition position = positionCache.get(currentGroupId);
+        if (position == null) {
+            savePositionToPositionsCache();
+            position = positionCache.get(currentGroupId);
+        }
         position.newMsgIds = newMsgTipBar.getValues();
         final String groupId = currentGroupId;
         FriendsTimeLineDBTask.asyncUpdatePosition(position, GlobalContext.getInstance().getCurrentAccountId(), groupId);
@@ -238,7 +246,7 @@ public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<Mes
         super.onHiddenChanged(hidden);
         if (!hidden) {
             buildActionBarNav();
-            ((MainTimeLineActivity) getActivity()).setCurrentFragment(this);
+//            ((MainTimeLineActivity) getActivity()).setCurrentFragment(this);
         }
     }
 
@@ -342,6 +350,11 @@ public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<Mes
     public void onChange(UserBean newUserBean) {
         if (navAdapter != null)
             navAdapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public void scrollToTop() {
+        Utility.stopListViewScrollingAndScrollToTop(getListView());
     }
 
     private class DBCacheTask extends MyAsyncTask<Void, MessageTimeLineData, List<MessageTimeLineData>> {
@@ -482,6 +495,28 @@ public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<Mes
 
     }
 
+    protected void middleMsgOnPostExecute(int position, MessageListBean newValue, boolean towardsBottom) {
+
+        if (newValue != null) {
+            int size = newValue.getSize();
+
+            if (getActivity() != null && newValue.getSize() > 0) {
+                getList().addMiddleData(position, newValue, towardsBottom);
+
+                if (towardsBottom) {
+                    getAdapter().notifyDataSetChanged();
+                } else {
+
+                    View v = Utility.getListViewItemViewFromPosition(getListView(), position + 1 + 1);
+                    int top = (v == null) ? 0 : v.getTop();
+                    getAdapter().notifyDataSetChanged();
+                    int ss = position + 1 + size - 1;
+                    getListView().setSelectionFromTop(ss, top);
+                }
+            }
+        }
+    }
+
     private void addNewDataWithoutRememberPosition(MessageListBean newValue) {
         newMsgTipBar.setValue(newValue, true);
 
@@ -508,6 +543,10 @@ public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<Mes
         getLoaderManager().destroyLoader(OLD_MSG_LOADER_ID);
         getPullToRefreshListView().onRefreshComplete();
         dismissFooterView();
+        savedCurrentLoadingMsgViewPositon = -1;
+        if (timeLineAdapter instanceof AbstractAppListAdapter) {
+            ((AbstractAppListAdapter) timeLineAdapter).setSavedMiddleLoadingViewPosition(savedCurrentLoadingMsgViewPositon);
+        }
 
         positionCache.put(currentGroupId, Utility.getCurrentPositionFromListView(getListView()));
         saveNewMsgCountToPositionsCache();
@@ -620,10 +659,11 @@ public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<Mes
             getAdapter().notifyDataSetChanged();
             FriendsTimeLineDBTask.asyncReplace(getList(), accountBean.getUid(), currentGroupId);
         }
+
     }
 
     @Override
-    public void loadMiddleMsg(String beginId, String endId, String endTag, int position) {
+    public void loadMiddleMsg(String beginId, String endId, int position) {
         getLoaderManager().destroyLoader(NEW_MSG_LOADER_ID);
         getLoaderManager().destroyLoader(OLD_MSG_LOADER_ID);
         getPullToRefreshListView().onRefreshComplete();
@@ -632,8 +672,9 @@ public class FriendsTimeLineFragment extends AbstractMessageTimeLineFragment<Mes
         Bundle bundle = new Bundle();
         bundle.putString("beginId", beginId);
         bundle.putString("endId", endId);
-        bundle.putString("endTag", endTag);
         bundle.putInt("position", position);
+        VelocityListView velocityListView = (VelocityListView) getListView();
+        bundle.putBoolean("towardsBottom", velocityListView.getTowardsOrientation() == VelocityListView.TOWARDS_BOTTOM);
         getLoaderManager().restartLoader(MIDDLE_MSG_LOADER_ID, bundle, msgCallback);
 
     }
