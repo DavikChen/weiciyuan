@@ -98,22 +98,6 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
     }
 
 
-    public void refreshUnread(UnreadBean unreadBean) {
-
-//        Activity activity = getActivity();
-//        if (activity != null) {
-//            if (unreadBean == null) {
-//                activity.getActionBar().getTabAt(2).setText(getString(R.string.comments));
-//                return;
-//            }
-//            this.unreadBean = unreadBean;
-//            String number = Utility.buildTabText(unreadBean.getMention_cmt() + unreadBean.getCmt());
-//            if (!TextUtils.isEmpty(number))
-//                activity.getActionBar().getTabAt(2).setText(getString(R.string.comments) + number);
-//        }
-    }
-
-
     @Override
     protected void onListViewScrollStop() {
         super.onListViewScrollStop();
@@ -123,6 +107,7 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
     @Override
     public void onResume() {
         super.onResume();
+        setListViewPositionFromPositionsCache();
         LocalBroadcastManager.getInstance(getActivity()).registerReceiver(newBroadcastReceiver, new IntentFilter(AppEventAction.NEW_MSG_BROADCAST));
         setActionBarTabCount(newMsgTipBar.getValues().size());
 
@@ -130,8 +115,10 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
             @Override
             public void onChange(int count) {
                 ((MainTimeLineActivity) getActivity()).setCommentsToMeCount(count);
+                setActionBarTabCount(count);
             }
         });
+        checkUnreadInfo();
     }
 
     @Override
@@ -147,14 +134,21 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
         CommentsTimeLineDBTask.asyncUpdatePosition(timeLinePosition, accountBean.getUid());
     }
 
-    @Override
-    public void setUserVisibleHint(boolean isVisibleToUser) {
-        super.setUserVisibleHint(isVisibleToUser);
-//        if (isVisible() && isVisibleToUser) {
-//            if (getActivity().getActionBar().getTabAt(0).getText().toString().contains(")")) {
-//                getPullToRefreshListView().startRefreshNow();
-//            }
-//        }
+
+    private void checkUnreadInfo() {
+        Loader loader = getLoaderManager().getLoader(DB_CACHE_LOADER_ID);
+        if (loader != null) {
+            return;
+        }
+        Intent intent = getActivity().getIntent();
+        CommentListBean commentsToMe = (CommentListBean) intent.getSerializableExtra("comment");
+
+        if (commentsToMe != null) {
+            addNewDataAndRememberPosition(commentsToMe);
+            CommentListBean nullObject = null;
+            intent.putExtra("comment", nullObject);
+            getActivity().setIntent(intent);
+        }
     }
 
     private void setActionBarTabCount(int count) {
@@ -202,12 +196,11 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
                     clearAndReplaceValue(savedBean);
                     timeLineAdapter.notifyDataSetChanged();
                     refreshLayout(getList());
-                    setListViewPositionFromPositionsCache();
+//                    setListViewPositionFromPositionsCache();
                 }
                 break;
         }
 
-        refreshUnread(unreadBean);
     }
 
     @Override
@@ -360,7 +353,6 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
             addNewDataAndRememberPosition(newValue);
         }
         unreadBean = null;
-        refreshUnread(unreadBean);
         NotificationManager notificationManager = (NotificationManager) getActivity()
                 .getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.cancel(Long.valueOf(GlobalContext.getInstance().getCurrentAccountId()).intValue());
@@ -475,6 +467,7 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
             }
             getLoaderManager().destroyLoader(loader.getId());
 
+            checkUnreadInfo();
         }
 
         @Override
@@ -517,8 +510,11 @@ public class CommentsToMeTimeLineFragment extends AbstractTimeLineFragment<Comme
                 return;
             }
             CommentListBean data = (CommentListBean) intent.getSerializableExtra(BundleArgsConstants.COMMENTS_TO_ME_EXTRA);
-            if (data != null) {
-                addNewDataAndRememberPosition(data);
+            if (data != null && data.getSize() > 0) {
+                CommentBean last = data.getItem(data.getSize() - 1);
+                boolean dup = getList().getItemList().contains(last);
+                if (!dup)
+                    addNewDataAndRememberPosition(data);
             }
         }
     };

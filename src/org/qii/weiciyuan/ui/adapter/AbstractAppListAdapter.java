@@ -160,6 +160,9 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
                     drawable.setCallback(null);
                     holder.content_pic.setImageBitmap(null);
                     holder.content_pic.getImageView().clearAnimation();
+                    ProgressBar pb = holder.content_pic.getProgressBar();
+                    if (pb != null)
+                        pb.setVisibility(View.GONE);
                 }
             }
 
@@ -168,6 +171,9 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
                     drawable.setCallback(null);
                     holder.repost_content_pic.setImageBitmap(null);
                     holder.repost_content_pic.getImageView().clearAnimation();
+                    ProgressBar pb = holder.repost_content_pic.getProgressBar();
+                    if (pb != null)
+                        pb.setVisibility(View.GONE);
                 }
             }
         });
@@ -498,13 +504,18 @@ public abstract class AbstractAppListAdapter<T extends ItemBean> extends BaseAda
                     getActivity().startActivity(intent);
                 }
             });
-            buildPic(msg, view.getImageView());
+            buildPic(msg, view);
         } else {
             view.setVisibility(View.GONE);
         }
     }
 
     private void buildPic(final MessageBean msg, ImageView view) {
+        view.setVisibility(View.VISIBLE);
+        commander.downContentPic(view, msg, (AbstractTimeLineFragment) fragment);
+    }
+
+    private void buildPic(final MessageBean msg, TimeLineImageView view) {
         view.setVisibility(View.VISIBLE);
         commander.downContentPic(view, msg, (AbstractTimeLineFragment) fragment);
     }
